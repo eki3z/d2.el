@@ -31,6 +31,7 @@
 
 ;;; Code:
 
+(require 'seq)
 (require 'treesit)
 (require 'transient)
 
@@ -47,9 +48,13 @@
 
 (defcustom d2-output-format "svg"
   "The d2 render picture format."
-  :type '(choice (const :tag "render diagram in png" "png")
-                 (const :tag "render diagram in svg" "svg"))
+  :type '(choice (const :tag "render diagram in svg" "svg")
+                 (const :tag "render diagram in png" "png")
+                 (const :tag "render diagram in pdf" "pdf"))
   :group 'd2)
+
+(defvar d2-format-list '("svg" "png" "pdf")
+  "Supported formats in rendering output.")
 
 
 ;;; d2-ts-mode config
@@ -258,12 +263,12 @@ all others will use their default render size."
 
 (defun d2-menu--format-description ()
   "Show output format description."
-  (let ((svg-p (string-equal d2-output-format "svg")))
-    (concat
-     "Toggle output format "
-     (propertize "svg" 'face (if svg-p 'transient-value 'transient-inactive-value))
-     (propertize " | " 'face 'transient-inactive-value)
-     (propertize "png" 'face (if svg-p 'transient-inactive-value 'transient-value)))))
+  (concat "Toggle output format "
+          (mapconcat (lambda (s) (if (string-equal s d2-output-format)
+                                     (propertize s 'face 'transient-value)
+                                   (propertize s 'face 'transient-key-noop)))
+                     d2-format-list
+                     (propertize "|" 'face 'transient-inactive-value))))
 
 
 ;;; Transient args
@@ -333,7 +338,9 @@ all others will use their default render size."
   :description 'd2-menu--format-description
   (interactive)
   (setq d2-output-format
-        (if (string-equal d2-output-format "svg") "png" "svg")))
+        (let* ((fmt d2-format-list)
+               (cur-index (seq-position fmt d2-output-format)))
+          (nth (mod (+ cur-index 1) (length fmt)) fmt))))
 
 (transient-define-suffix d2-menu--run ()
   "Run d2 cmd with ARGS."
