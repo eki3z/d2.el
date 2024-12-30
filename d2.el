@@ -68,13 +68,14 @@
 
 (defvar d2--treesit-font-lock-settings
   (treesit-font-lock-rules
-   :default-language 'd2
+   :language 'd2
    :feature 'comment
    '([(line_comment)
       (block_comment)]
      @font-lock-comment-face)
 
    ;; TODO wait for treesit parser nodes for d2-config
+   :language 'd2
    :feature 'builtin
    '((source_file
       (container
@@ -87,6 +88,7 @@
          (block (shape (shape_key) @font-lock-property-name-face
                        (label) @font-lock-constant-face)))))))
 
+   :language 'd2
    :feature 'keyword
    :override t
    `([(keyword_style)
@@ -95,33 +97,42 @@
       (keyword_underscore)]
      @font-lock-keyword-face)
 
+   :language 'd2
    :feature 'key
    '([(shape_key) (container_key)] @font-lock-function-name-face
      (attr_key) @font-lock-property-name-face)
 
+   :language 'd2
    :feature 'operator
    '((arrow) @font-lock-operator-face)
 
+   :language 'd2
    :feature 'number
    '([(float) (integer)] @font-lock-number-face)
 
+   :language 'd2
    :feature 'constant
    '((boolean) @font-lock-constant-face
      ((attr_value) @font-lock-constant-face
       (:equal @font-lock-constant-face "null")))
 
+   :language 'd2
    :feature 'variable
    '((class_name) @font-lock-variable-name-face)
 
+   :language 'd2
    :feature 'escape
    '((escape_sequence) @font-lock-escape-face)
 
+   :language 'd2
    :feature 'delimiter
    '([(dot) (colon) ";" "|"] @font-lock-delimiter-face)
 
+   :language 'd2
    :feature 'bracket
    '(["[" "]" "{" "}"] @font-lock-bracket-face)
 
+   :language 'd2
    :feature 'string
    '((label) @font-lock-type-face
      (language) @font-lock-preprocessor-face
@@ -133,6 +144,7 @@
       (string
        (string_fragment) @font-lock-string-face)))
 
+   :language 'd2
    :feature 'error
    '([(reserved) (ERROR)] @font-lock-warning-face))
   "Tree-sitter font-lock settings.")
