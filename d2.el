@@ -429,5 +429,15 @@ all others will use their default render size."
      ("t" d2-menu--toggle-format)
      ("r" "Run d2" d2-menu--run)]]])
 
+(defun d2-playground ()
+  "Open d2 playground to edit online."
+  (interactive)
+  (browse-url "https://play.d2lang.com"))
+
+(defun d2-icons ()
+  "Open icons collection available for d2."
+  (interactive)
+  (browse-url "https://icons.terrastruct.com/"))
+
 (provide 'd2)
 ;;; d2.el ends here
