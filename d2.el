@@ -1,6 +1,6 @@
 ;;; d2.el --- D2 diagram support -*- lexical-binding: t -*-
 
-;; Copyright (C) 2024 liuyinz
+;; Copyright (C) 2025 liuyinz
 
 ;; Author: liuyinz <liuyinz95@gmail.com>
 ;; Maintainer: liuyinz <liuyinz95@gmail.com>
@@ -225,6 +225,17 @@
               (base (file-name-base name)))
     (concat base "." d2-output-format)))
 
+(defun d2--parse-process (buffer)
+  "Return related d2 host and port in BUFFER."
+  (when (buffer-live-p (get-buffer buffer))
+    (with-current-buffer buffer
+      (goto-char (point-max))
+      (save-match-data
+        (when (re-search-backward "listening on http://\\([^:]+\\):\\([0-9]+\\)"
+                                  nil t 1)
+          (cons (match-string-no-properties 1)
+                (match-string-no-properties 2)))))))
+
 (defun d2-menu--set-port (prompt &rest _)
   "Set listening port with PROMPT."
   (when-let* ((port (read-number prompt 0)))
@@ -358,13 +369,29 @@ all others will use their default render size."
   (let* ((cmd (d2--executable-path))
          ;; TODO support region render
          (input (file-name-nondirectory (buffer-file-name)))
-         (output (d2--output-file)))
+         (output (d2--output-file))
+         (args (transient-args 'd2-menu))
+         (watch-p (member "--watch" args))
+         (watch-buf (format "*D2 Watch-%s*" output))
+         (proc (get-buffer-process watch-buf)))
     (cond
      ((not cmd) (user-error "Can not find d2 executable"))
      ((not output) (user-error "Current file is not d2 file"))
-     (t (async-shell-command
-         (string-join (flatten-list (list cmd (transient-args 'd2-menu)
-                                          input output)) " "))))))
+     (t
+      (when (and proc watch-p)
+        ;; get host and port to reuse
+        (when-let* ((opened-url (d2--parse-process watch-buf)))
+          (setq args (append args (list (concat "--host=" (car opened-url))
+                                        (concat "--port=" (cdr opened-url))
+                                        "--browser=0"))))
+        ;; kill existing process
+        (let* ((inhibit-message t))
+          (delete-process proc))
+        (message "D2: restart watch %s" input))
+
+      (async-shell-command
+       (string-join (flatten-list (list cmd args input output)) " ")
+       (and watch-p watch-buf))))))
 
 (dolist (sym '(d2-menu--run d2-menu--toggle-format))
   (put sym 'completion-predicate #'ignore))
