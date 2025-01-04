@@ -33,6 +33,7 @@
 (require 'treesit)
 (require 'transient)
 
+(declare-function xwidget-webkit-browse-url "xwidget")
 (declare-function treesit-parser-create "treesit.c")
 
 (defgroup d2 nil
@@ -44,11 +45,17 @@
   :type 'string
   :group 'd2)
 
-(defcustom d2-output-format "svg"
-  "The d2 render picture format."
+(defcustom d2-format "svg"
+  "The format of d2 diagram render to."
   :type '(choice (const :tag "render diagram in svg" "svg")
                  (const :tag "render diagram in png" "png")
                  (const :tag "render diagram in pdf" "pdf"))
+  :group 'd2)
+
+(defcustom d2-platform 'browser
+  "The platform of d2 diatram to be watched."
+  :type '(choice (const :tag "render diagram in browser" browser)
+                 (const :tag "render diagram in xwidget" xwidget))
   :group 'd2)
 
 (defvar d2-format-list '("svg" "png" "pdf")
@@ -223,18 +230,20 @@
   (when-let* ((name (buffer-file-name))
               ((equal (file-name-extension name) "d2"))
               (base (file-name-base name)))
-    (concat base "." d2-output-format)))
+    (concat base "." d2-format)))
 
 (defun d2--parse-process (buffer)
   "Return related d2 host and port in BUFFER."
+  (message "buffer exist? : %S" (get-buffer buffer))
   (when (buffer-live-p (get-buffer buffer))
     (with-current-buffer buffer
       (goto-char (point-max))
       (save-match-data
-        (when (re-search-backward "listening on http://\\([^:]+\\):\\([0-9]+\\)"
+        (message "before search")
+        (when (re-search-backward "listening on \\(http://\\([^:]+\\):\\([0-9]+\\)\\)"
                                   nil t 1)
-          (cons (match-string-no-properties 1)
-                (match-string-no-properties 2)))))))
+          (message "match: %S" (match-string-no-properties 0))
+          (mapcar #'match-string-no-properties '(1 2 3)))))))
 
 (defun d2-menu--set-port (prompt &rest _)
   "Set listening port with PROMPT."
@@ -282,10 +291,19 @@ all others will use their default render size."
   "Set output target with PROMPT."
   (read-string prompt))
 
+(defun d2-menu--platform-description ()
+  ""
+  (concat "Toggle platform "
+          (mapconcat (lambda (s) (if (string-equal s (symbol-name d2-platform))
+                                     (propertize s 'face 'transient-value)
+                                   (propertize s 'face 'transient-key-noop)))
+                     '("browser" "xwidget")
+                     (propertize "|" 'face 'transient-inactive-value))))
+
 (defun d2-menu--format-description ()
   "Show output format description."
-  (concat "Toggle output format "
-          (mapconcat (lambda (s) (if (string-equal s d2-output-format)
+  (concat "Toggle format "
+          (mapconcat (lambda (s) (if (string-equal s d2-format)
                                      (propertize s 'face 'transient-value)
                                    (propertize s 'face 'transient-key-noop)))
                      d2-format-list
@@ -353,20 +371,30 @@ all others will use their default render size."
   :prompt "D2 excetuable path: "
   :variable 'd2-executable)
 
+(transient-define-suffix d2-menu--toggle-platform ()
+  :transient t
+  :description 'd2-menu--platform-description
+  (interactive)
+  (setq d2-platform
+        (if (eq d2-platform 'xwidget)
+            'browser
+          'xwidget)))
+
 (transient-define-suffix d2-menu--toggle-format ()
-  "Toggle `d2-output-format'."
+  "Toggle `d2-format'."
   :transient t
   :description 'd2-menu--format-description
   (interactive)
-  (setq d2-output-format
+  (setq d2-format
         (let* ((fmt d2-format-list)
-               (cur-index (seq-position fmt d2-output-format)))
+               (cur-index (seq-position fmt d2-format)))
           (nth (mod (+ cur-index 1) (length fmt)) fmt))))
 
 (transient-define-suffix d2-menu--run ()
   "Run d2 cmd with ARGS."
   (interactive)
   (let* ((cmd (d2--executable-path))
+         (xwidget-p (eq d2-platform 'xwidget))
          ;; TODO support region render
          (input (file-name-nondirectory (buffer-file-name)))
          (output (d2--output-file))
@@ -378,20 +406,33 @@ all others will use their default render size."
      ((not cmd) (user-error "Can not find d2 executable"))
      ((not output) (user-error "Current file is not d2 file"))
      (t
+      ;; kill existing process if needed
       (when (and proc watch-p)
         ;; get host and port to reuse
         (when-let* ((opened-url (d2--parse-process watch-buf)))
-          (setq args (append args (list (concat "--host=" (car opened-url))
-                                        (concat "--port=" (cdr opened-url))
+          (setq args (append args (list (concat "--host=" (nth 1 opened-url))
+                                        (concat "--port=" (nth 2 opened-url))
                                         "--browser=0"))))
-        ;; kill existing process
         (let* ((inhibit-message t))
           (delete-process proc))
         (message "D2: restart watch %s" input))
 
-      (async-shell-command
-       (string-join (flatten-list (list cmd args input output)) " ")
-       (and watch-p watch-buf))))))
+      (when (and watch-p xwidget-p)
+        (setq args (append args (list "--browser=0"))))
+
+      ;; do not popup related buffers
+      (let ((display-buffer-alist
+             (cons `(,(regexp-quote watch-buf)
+                     (display-buffer-no-window))
+                   display-buffer-alist)))
+        (async-shell-command
+         (string-join (flatten-list (list cmd (seq-uniq args) input output)) " ")
+         (and watch-p watch-buf)))
+      (when (and watch-p xwidget-p (not proc))
+        (save-excursion
+          (sleep-for 2)
+          (switch-to-buffer-other-window (current-buffer))
+          (xwidget-webkit-browse-url (car (d2--parse-process watch-buf)) t)))))))
 
 (dolist (sym '(d2-menu--run d2-menu--toggle-format))
   (put sym 'completion-predicate #'ignore))
@@ -418,7 +459,7 @@ all others will use their default render size."
     ("-B" "Select browser to open" "--browser=")
     ("-d" "print debug logs" "--debug")]
    ["Svg"
-    ;; :if (lambda () (string-equal d2-output-format "svg"))
+    ;; :if (lambda () (string-equal d2-format "svg"))
     ("-b" "Bundle all assets and layers when output svg" "--bundle")
     ("-c" "Center the SVG in the containing viewbox" "--center")
     ("-F" "Add appendix to SVG" "--force-appendix")
@@ -426,6 +467,7 @@ all others will use their default render size."
     ("-S" "Scale the SVG output" d2-menu--arg-scale)]
    [["Commands"
      ("b" d2-menu--var-bin)
+     ("x" d2-menu--toggle-platform)
      ("t" d2-menu--toggle-format)
      ("r" "Run d2" d2-menu--run)]]])
 
