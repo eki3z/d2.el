@@ -387,6 +387,7 @@ all others will use their default render size."
                (cur-index (seq-position fmt d2-format)))
           (nth (mod (+ cur-index 1) (length fmt)) fmt))))
 
+;;;###autoload
 (transient-define-suffix d2-run (&optional args)
   "Run d2 cmd with ARGS."
   (interactive)
@@ -437,11 +438,13 @@ all others will use their default render size."
                    (switch-to-buffer-other-window (get-file-buffer input))
                    (xwidget-webkit-browse-url (car url) t))))))))))))
 
+;;;###autoload
 (defun d2-open-playground ()
   "Open d2 playground to edit online."
   (interactive)
   (browse-url "https://play.d2lang.com"))
 
+;;;###autoload
 (defun d2-browse-icons ()
   "Open icons collection available for d2."
   (interactive)
