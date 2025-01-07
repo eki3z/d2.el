@@ -415,28 +415,28 @@ all others will use their default render size."
                              args))
           (let* ((inhibit-message t))
             (delete-process proc))
-          (message "D2: restart watch %s" input))
+          (message "D2: restart watch %s" input)))
 
-        (when (and watch-p xwidget-p)
-          (setq args (append args (list "--browser=0"))))
+      (when (and watch-p xwidget-p)
+        (setq args (append args (list "--browser=0"))))
 
-        (apply #'start-process
-               (flatten-list
-                (list proc-name
-                      (and watch-p watch-buf)
-                      cmd args input output)))
+      (apply #'start-process
+             (flatten-list
+              (list proc-name
+                    (and watch-p watch-buf)
+                    cmd args input output)))
 
-        (when (and watch-p xwidget-p (not proc))
-          (set-process-filter
-           (get-process proc-name)
-           (lambda (process output)
-             (with-current-buffer (process-buffer process)
-               (let ((pos (point-max)))
-                 (goto-char pos)
-                 (insert output)
-                 (when-let* ((url (d2--parse-process (current-buffer) pos)))
-                   (switch-to-buffer-other-window (get-file-buffer input))
-                   (xwidget-webkit-browse-url (car url) t))))))))))))
+      (when (and watch-p xwidget-p (not proc))
+        (set-process-filter
+         (get-process proc-name)
+         (lambda (process output)
+           (with-current-buffer (process-buffer process)
+             (let ((pos (point-max)))
+               (goto-char pos)
+               (insert output)
+               (when-let* ((url (d2--parse-process (current-buffer) pos)))
+                 (switch-to-buffer-other-window (get-file-buffer input))
+                 (xwidget-webkit-browse-url (car url) t)))))))))))
 
 ;;;###autoload
 (defun d2-open-playground ()
