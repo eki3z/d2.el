@@ -50,9 +50,9 @@ Install with `M-x package-install` `RET` `d2` within Emacs.
 
 ## Usage
 
-### Install treesit grammer
+### Install treesit grammar
 
-Target d2 treesit grammer: https://codeberg.org/p8i/tree-sitter-d2
+Target d2 treesit grammar: https://codeberg.org/p8i/tree-sitter-d2
 
 ### load library
 

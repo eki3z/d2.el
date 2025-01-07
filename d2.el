@@ -53,7 +53,7 @@
   :group 'd2)
 
 (defcustom d2-platform 'browser
-  "The platform of d2 diatram to be watched."
+  "The platform of d2 diagram to be watched."
   :type '(choice (const :tag "render diagram in browser" browser)
                  (const :tag "render diagram in xwidget" xwidget))
   :group 'd2)
@@ -271,7 +271,7 @@
     (number-to-string interval)))
 
 (defun d2-menu--set-timeout (prompt &rest _)
-  "Set timeout before  D2 runs and exiting if diagram is too large with PROMPT."
+  "Set timeout before  D2 run and exit if diagram is too large with PROMPT."
   (when-let* ((timeout (read-number prompt 120)))
     (number-to-string timeout)))
 
@@ -365,7 +365,7 @@ all others will use their default render size."
 (transient-define-infix d2-menu--var-bin ()
   :class 'transient-lisp-variable
   :description "Set executable path "
-  :prompt "D2 excetuable path: "
+  :prompt "D2 executable path: "
   :variable 'd2-executable)
 
 (transient-define-suffix d2-menu--toggle-platform ()
@@ -471,7 +471,7 @@ all others will use their default render size."
     ("-P"  "Padding in px" d2-menu--arg-pad)
     ("-R" "Target board to render" d2-menu--arg-target)]
    ["Other"
-    ("-O" "Maximum number of seconds d2 runs" d2-menu--arg-timeout)
+    ("-O" "Maximum number of seconds d2 run" d2-menu--arg-timeout)
     ("-B" "Select browser to open" "--browser=")
     ("-d" "print debug logs" "--debug")]
    ["Svg"
