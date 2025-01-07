@@ -232,17 +232,14 @@
               (base (file-name-base name)))
     (concat base "." d2-format)))
 
-(defun d2--parse-process (buffer)
-  "Return related d2 host and port in BUFFER."
-  (message "buffer exist? : %S" (get-buffer buffer))
+(defun d2--parse-process (buffer &optional bound)
+  "Return related d2 host and port in BUFFER from BOUND."
   (when (buffer-live-p (get-buffer buffer))
     (with-current-buffer buffer
       (goto-char (point-max))
       (save-match-data
-        (message "before search")
         (when (re-search-backward "listening on \\(http://\\([^:]+\\):\\([0-9]+\\)\\)"
-                                  nil t 1)
-          (message "match: %S" (match-string-no-properties 0))
+                                  bound t 1)
           (mapcar #'match-string-no-properties '(1 2 3)))))))
 
 (defun d2-menu--set-port (prompt &rest _)
@@ -292,7 +289,7 @@ all others will use their default render size."
   (read-string prompt))
 
 (defun d2-menu--platform-description ()
-  ""
+  "Show platform description."
   (concat "Toggle platform "
           (mapconcat (lambda (s) (if (string-equal s (symbol-name d2-platform))
                                      (propertize s 'face 'transient-value)
@@ -390,7 +387,7 @@ all others will use their default render size."
                (cur-index (seq-position fmt d2-format)))
           (nth (mod (+ cur-index 1) (length fmt)) fmt))))
 
-(transient-define-suffix d2-menu--run ()
+(transient-define-suffix d2-run (&optional args)
   "Run d2 cmd with ARGS."
   (interactive)
   (let* ((cmd (d2--executable-path))
@@ -398,43 +395,59 @@ all others will use their default render size."
          ;; TODO support region render
          (input (file-name-nondirectory (buffer-file-name)))
          (output (d2--output-file))
-         (args (transient-args 'd2-menu))
+         (args (or args (transient-args 'd2-menu)))
          (watch-p (member "--watch" args))
          (watch-buf (format "*D2 Watch-%s*" output))
+         (proc-name (format "D2 %s" output))
          (proc (get-buffer-process watch-buf)))
     (cond
      ((not cmd) (user-error "Can not find d2 executable"))
      ((not output) (user-error "Current file is not d2 file"))
      (t
       ;; kill existing process if needed
-      (when (and proc watch-p)
+      (when (and watch-p proc)
         ;; get host and port to reuse
         (when-let* ((opened-url (d2--parse-process watch-buf)))
-          (setq args (append args (list (concat "--host=" (nth 1 opened-url))
-                                        (concat "--port=" (nth 2 opened-url))
-                                        "--browser=0"))))
-        (let* ((inhibit-message t))
-          (delete-process proc))
-        (message "D2: restart watch %s" input))
+          (setq args (append (list (concat "--host=" (nth 1 opened-url))
+                                   (concat "--port=" (nth 2 opened-url))
+                                   "--browser=0")
+                             args))
+          (let* ((inhibit-message t))
+            (delete-process proc))
+          (message "D2: restart watch %s" input))
 
-      (when (and watch-p xwidget-p)
-        (setq args (append args (list "--browser=0"))))
+        (when (and watch-p xwidget-p)
+          (setq args (append args (list "--browser=0"))))
 
-      ;; do not popup related buffers
-      (let ((display-buffer-alist
-             (cons `(,(regexp-quote watch-buf)
-                     (display-buffer-no-window))
-                   display-buffer-alist)))
-        (async-shell-command
-         (string-join (flatten-list (list cmd (seq-uniq args) input output)) " ")
-         (and watch-p watch-buf)))
-      (when (and watch-p xwidget-p (not proc))
-        (save-excursion
-          (sleep-for 2)
-          (switch-to-buffer-other-window (current-buffer))
-          (xwidget-webkit-browse-url (car (d2--parse-process watch-buf)) t)))))))
+        (apply #'start-process
+               (flatten-list
+                (list proc-name
+                      (and watch-p watch-buf)
+                      cmd args input output)))
 
-(dolist (sym '(d2-menu--run d2-menu--toggle-format))
+        (when (and watch-p xwidget-p (not proc))
+          (set-process-filter
+           (get-process proc-name)
+           (lambda (process output)
+             (with-current-buffer (process-buffer process)
+               (let ((pos (point-max)))
+                 (goto-char pos)
+                 (insert output)
+                 (when-let* ((url (d2--parse-process (current-buffer) pos)))
+                   (switch-to-buffer-other-window (get-file-buffer input))
+                   (xwidget-webkit-browse-url (car url) t))))))))))))
+
+(defun d2-open-playground ()
+  "Open d2 playground to edit online."
+  (interactive)
+  (browse-url "https://play.d2lang.com"))
+
+(defun d2-browse-icons ()
+  "Open icons collection available for d2."
+  (interactive)
+  (browse-url "https://icons.terrastruct.com/"))
+
+(dolist (sym '(d2-menu--toggle-format d2-menu--toggle-platform))
   (put sym 'completion-predicate #'ignore))
 
 ;;;###autoload (autoload 'd2-menu "d2" nil t)
@@ -469,17 +482,9 @@ all others will use their default render size."
      ("b" d2-menu--var-bin)
      ("x" d2-menu--toggle-platform)
      ("t" d2-menu--toggle-format)
-     ("r" "Run d2" d2-menu--run)]]])
-
-(defun d2-playground ()
-  "Open d2 playground to edit online."
-  (interactive)
-  (browse-url "https://play.d2lang.com"))
-
-(defun d2-icons ()
-  "Open icons collection available for d2."
-  (interactive)
-  (browse-url "https://icons.terrastruct.com/"))
+     ("i" "Browse hosted icons" d2-browse-icons)
+     ("p" "Open d2 playground" d2-open-playground)
+     ("r" "Run d2 command" d2-run)]]])
 
 (provide 'd2)
 ;;; d2.el ends here
