@@ -435,8 +435,9 @@ all others will use their default render size."
                (goto-char pos)
                (insert output)
                (when-let* ((url (d2--parse-process (current-buffer) pos)))
-                 (switch-to-buffer-other-window (get-file-buffer input))
-                 (xwidget-webkit-browse-url (car url) t)))))))))))
+                 (save-selected-window
+                   (switch-to-buffer-other-window (get-file-buffer input))
+                   (xwidget-webkit-browse-url (car url) t))))))))))))
 
 ;;;###autoload
 (defun d2-open-playground ()
