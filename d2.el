@@ -410,8 +410,7 @@ all others will use their default render size."
         ;; get host and port to reuse
         (when-let* ((opened-url (d2--parse-process watch-buf)))
           (setq args (append (list (concat "--host=" (nth 1 opened-url))
-                                   (concat "--port=" (nth 2 opened-url))
-                                   "--browser=0")
+                                   (concat "--port=" (nth 2 opened-url)))
                              args))
           (let* ((inhibit-message t))
             (delete-process proc))
