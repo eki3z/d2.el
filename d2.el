@@ -45,11 +45,11 @@
   :type 'string
   :group 'd2)
 
-(defcustom d2-format "svg"
+(defcustom d2-format 'svg
   "The format of d2 diagram render to."
-  :type '(choice (const :tag "render diagram in svg" "svg")
-                 (const :tag "render diagram in png" "png")
-                 (const :tag "render diagram in pdf" "pdf"))
+  :type '(choice (const :tag "render diagram in svg" svg)
+                 (const :tag "render diagram in png" png)
+                 (const :tag "render diagram in pdf" pdf))
   :group 'd2)
 
 (defcustom d2-platform 'browser
@@ -58,7 +58,10 @@
                  (const :tag "render diagram in xwidget" xwidget))
   :group 'd2)
 
-(defvar d2-format-list '("svg" "png" "pdf")
+(defvar d2-platform-options '(browser xwidget)
+  "Supported platforms in rendering output.")
+
+(defvar d2-format-options '(svg png pdf)
   "Supported formats in rendering output.")
 
 
@@ -288,23 +291,32 @@ all others will use their default render size."
   "Set output target with PROMPT."
   (read-string prompt))
 
+(defmacro d2--description (prefix var options)
+  "Return descriptions for suffix with PREFIX, VAR and OPTIONS."
+  `(concat ,prefix
+           (mapconcat
+            (lambda (s)
+              (propertize (symbol-name s) 'face
+                          (if (eq ,var s)
+                              'transient-value
+                            'transient-key-noop)))
+            ,options
+            (propertize "|" 'face 'transient-inactive-value))))
+
 (defun d2-menu--platform-description ()
   "Show platform description."
-  (concat "Toggle platform "
-          (mapconcat (lambda (s) (if (string-equal s (symbol-name d2-platform))
-                                     (propertize s 'face 'transient-value)
-                                   (propertize s 'face 'transient-key-noop)))
-                     '("browser" "xwidget")
-                     (propertize "|" 'face 'transient-inactive-value))))
+  (d2--description "Toggle platform " d2-platform d2-platform-options))
 
 (defun d2-menu--format-description ()
   "Show output format description."
-  (concat "Toggle format "
-          (mapconcat (lambda (s) (if (string-equal s d2-format)
-                                     (propertize s 'face 'transient-value)
-                                   (propertize s 'face 'transient-key-noop)))
-                     d2-format-list
-                     (propertize "|" 'face 'transient-inactive-value))))
+  (d2--description "Toggle format " d2-format d2-format-options))
+
+(defmacro d2--toggle (var options)
+  "Toggle VAR in OPTIONS."
+  `(setq ,var
+         (nth (mod (1+ (seq-position ,options ,var #'eq))
+                   (length ,options))
+              ,options)))
 
 
 ;;; Transient args
@@ -372,20 +384,15 @@ all others will use their default render size."
   :transient t
   :description 'd2-menu--platform-description
   (interactive)
-  (setq d2-platform
-        (if (eq d2-platform 'xwidget)
-            'browser
-          'xwidget)))
+  ;; TODO support three options
+  (d2--toggle d2-platform d2-platform-options))
 
 (transient-define-suffix d2-menu--toggle-format ()
   "Toggle `d2-format'."
   :transient t
   :description 'd2-menu--format-description
   (interactive)
-  (setq d2-format
-        (let* ((fmt d2-format-list)
-               (cur-index (seq-position fmt d2-format)))
-          (nth (mod (+ cur-index 1) (length fmt)) fmt))))
+  (d2--toggle d2-format d2-format-options))
 
 ;;;###autoload
 (transient-define-suffix d2-run (&optional args)
