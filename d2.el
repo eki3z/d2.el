@@ -430,10 +430,9 @@ all others will use their default render size."
           (setq args (append args (list "--browser=0")))))
 
       (apply #'start-process
-             (flatten-list
-              (list proc-name
-                    (and watch-p watch-buf)
-                    cmd args input output)))
+             (append (list proc-name (and watch-p watch-buf) cmd)
+                     args
+                     (list input output)))
 
       (when (and watch-p (get-buffer watch-buf))
         (when (and xwidget-p (not (memq 'xwidget d2--opened-platform)))
