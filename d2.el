@@ -64,6 +64,8 @@
 (defvar d2-format-options '(svg png pdf)
   "Supported formats in rendering output.")
 
+(defvar-local d2--opened-platform nil)
+
 
 ;;; d2-ts-mode config
 
@@ -233,7 +235,7 @@
   (when-let* ((name (buffer-file-name))
               ((equal (file-name-extension name) "d2"))
               (base (file-name-base name)))
-    (concat base "." d2-format)))
+    (concat base "." (symbol-name d2-format))))
 
 (defun d2--parse-process (buffer &optional bound)
   "Return related d2 host and port in BUFFER from BOUND."
@@ -412,19 +414,20 @@ all others will use their default render size."
      ((not cmd) (user-error "Can not find d2 executable"))
      ((not output) (user-error "Current file is not d2 file"))
      (t
-      ;; kill existing process if needed
-      (when (and watch-p proc)
-        ;; get host and port to reuse
-        (when-let* ((opened-url (d2--parse-process watch-buf)))
-          (setq args (append (list (concat "--host=" (nth 1 opened-url))
-                                   (concat "--port=" (nth 2 opened-url)))
-                             args))
-          (let* ((inhibit-message t))
-            (delete-process proc))
-          (message "D2: restart watch %s" input)))
+      (when watch-p
+        ;; kill existing process if needed
+        (when proc
+          ;; get host and port to reuse
+          (when-let* ((opened-url (d2--parse-process watch-buf)))
+            (setq args (append (list (concat "--host=" (nth 1 opened-url))
+                                     (concat "--port=" (nth 2 opened-url)))
+                               args))
+            (let* ((inhibit-message t))
+              (delete-process proc))
+            (message "D2: restart watch %s" input)))
 
-      (when (and watch-p xwidget-p)
-        (setq args (append args (list "--browser=0"))))
+        (when xwidget-p
+          (setq args (append args (list "--browser=0")))))
 
       (apply #'start-process
              (flatten-list
@@ -432,18 +435,21 @@ all others will use their default render size."
                     (and watch-p watch-buf)
                     cmd args input output)))
 
-      (when (and watch-p xwidget-p (not proc))
-        (set-process-filter
-         (get-process proc-name)
-         (lambda (process output)
-           (with-current-buffer (process-buffer process)
-             (let ((pos (point-max)))
-               (goto-char pos)
-               (insert output)
-               (when-let* ((url (d2--parse-process (current-buffer) pos)))
-                 (save-selected-window
-                   (switch-to-buffer-other-window (get-file-buffer input))
-                   (xwidget-webkit-browse-url (car url) t))))))))))))
+      (when (and watch-p (get-buffer watch-buf))
+        (when (and xwidget-p (not (memq 'xwidget d2--opened-platform)))
+          (set-process-filter
+           (get-process proc-name)
+           (lambda (process output)
+             (with-current-buffer (process-buffer process)
+               (let ((pos (point-max)))
+                 (goto-char pos)
+                 (insert output)
+                 (when-let* ((url (d2--parse-process (current-buffer) pos)))
+                   (save-selected-window
+                     (switch-to-buffer-other-window (get-file-buffer input))
+                     (xwidget-webkit-browse-url (car url) t))))))))
+
+        (cl-pushnew d2-platform d2--opened-platform :test #'eq))))))
 
 ;;;###autoload
 (defun d2-open-playground ()
