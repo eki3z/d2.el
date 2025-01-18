@@ -27,6 +27,9 @@
 ;; See https://d2lang.com/
 ;; See https://codeberg.org/p8i/tree-sitter-d2.git
 
+;; TODO add auto save feature for watching files
+;; TODO support fine-grined control like multiple themes at same time
+
 ;;; Code:
 
 (require 'seq)
