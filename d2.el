@@ -33,6 +33,7 @@
 ;;; Code:
 
 (require 'seq)
+(require 'cl-lib)
 (require 'treesit)
 (require 'transient)
 
